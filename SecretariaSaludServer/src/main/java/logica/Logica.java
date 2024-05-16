@@ -8,13 +8,14 @@ import interfaces.*;
 import java.sql.Connection;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.sql.Date;
 import javax.crypto.SecretKey;
 
+import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
@@ -210,79 +211,49 @@ public class Logica implements ILogica {
     public boolean autenticarPaciente(String curp, String pass) {
         return authService.autenticarPaciente(curp, pass);
     }
+
     // Autentica un médico por cédula y contraseña
-@Override
-public boolean autenticarMedico(String cedula, String pass) {
-    return authService.autenticarMedico(cedula, pass);
-}
-
-// Autentica una credencial (paciente o médico) y genera un token JWT
-public boolean autenticar(String credencial, String pass) {
-    if (credencial.length() == 18) { // Si la credencial tiene 18 caracteres, es un CURP (paciente)
-        if (autenticarPaciente(credencial, pass)) {
-            String token = generarToken(credencial);
-            System.out.println("Token generado para paciente " + credencial + ": " + token);
-            return true;
-        }
-    } else { // De lo contrario, es una cédula (médico)
-        if (autenticarMedico(credencial, pass)) {
-            String token = generarToken(credencial);
-            System.out.println("Token generado para médico " + credencial + ": " + token);
-            return true;
-        }
+    @Override
+    public boolean autenticarMedico(String cedula, String pass) {
+        return authService.autenticarMedico(cedula, pass);
     }
-    return false;
-}
 
-// Genera un token JWT para un sujeto dado
-public static String generarToken(String sujeto) {
-    return Jwts.builder()
-            .setSubject(sujeto)
-            .setIssuedAt(new java.util.Date())
-            .setExpiration(new java.util.Date(System.currentTimeMillis() + 86400000)) // Expira en 24 horas
-            .signWith(SECRET_KEY)
-            .compact();
-}
-
-// Envia un mensaje a través de un socket cliente
-@Override
-public boolean enviar(String nombre, String mensaje) {
-    SocketCliente cliente = new SocketCliente("localhost", 1234);
-    String result = cliente.enviarMensaje("enviar!" + nombre + "!" + mensaje);
-    return "true".equalsIgnoreCase(result);
-}
-
-// Recibe un mensaje a través de un socket cliente
-@Override
-public String recibir(String nombre) {
-    SocketCliente cliente = new SocketCliente("localhost", 1234);
-    return cliente.enviarMensaje("recibir!" + nombre);
-}
-
-// Cambia el acceso de un expediente asociado a un paciente por su CURP
-@Override
-public boolean cambiarAcceso(String curp) {
-    Paciente paciente = pacienteService.consultarPaciente(curp);
-    if (paciente != null) {
-        Expediente expediente = expedienteService.consultarExpediente(paciente.getId());
-        if (expediente != null) {
-            boolean nuevoAcceso = !expediente.getAcceso();
-            return expedienteService.cambiarAcceso(paciente.getId(), nuevoAcceso);
+    // Autentica una credencial (paciente o médico) y genera un token JWT
+    @Override
+    public boolean autenticar(String credencial, String pass) {
+        if (credencial.length() == 18) { // Si la credencial tiene 18 caracteres, es un CURP (paciente)
+            if (autenticarPaciente(credencial, pass)) {
+                String token = generarToken(credencial);
+                System.out.println("Token generado para paciente " + credencial + ": " + token);
+                return true;
+            }
+        } else { // De lo contrario, es una cédula (médico)
+            if (autenticarMedico(credencial, pass)) {
+                String token = generarToken(credencial);
+                System.out.println("Token generado para médico " + credencial + ": " + token);
+                return true;
+            }
         }
+        return false;
     }
-    return false;
-}
 
-// Modifica los médicos que tienen acceso a un expediente asociado a un paciente por su CURP
-@Override
-public boolean modificarMedicos(String curp, String medicos) {
-    Paciente paciente = pacienteService.consultarPaciente(curp);
-    if (paciente != null) {
-        Expediente expediente = expedienteService.consultarExpediente(paciente.getId());
-        if (expediente != null) {
-            return expedienteService.modificarMedicos(paciente.getId(), medicos);
-        }
+    // Genera un token JWT para un sujeto dado con claims personalizados
+    public static String generarToken(String sujeto) {
+        return Jwts.builder()
+                .setSubject(sujeto)
+                .setIssuedAt(new Date())
+                .setExpiration(new Date(System.currentTimeMillis() + 86400000)) // Expira en 24 horas
+                .claim("role", "user") // Agregar claims personalizados
+                .signWith(SECRET_KEY, SignatureAlgorithm.HS256) // Asegurarse de usar un algoritmo seguro
+                .compact();
     }
-    return false;
-}
+
+    // Validar el token JWT
+    public static Claims validarToken(String token) {
+        return Jwts.parserBuilder()
+                .setSigningKey(SECRET_KEY)
+                .build()
+                .parseClaimsJws(token)
+                .getBody();
+    }
 }
