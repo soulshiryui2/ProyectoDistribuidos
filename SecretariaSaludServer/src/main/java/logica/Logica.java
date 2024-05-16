@@ -12,14 +12,14 @@ import java.util.List;
 import java.util.Optional;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.sql.Date;
+import javax.crypto.SecretKey;
 
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
-import java.sql.Date;
-import javax.crypto.SecretKey;
 
-public class Logica implements ILogica{
+public class Logica implements ILogica {
 
     private final IExpedienteService expedienteService;
     private final IPacienteService pacienteService;
@@ -29,6 +29,7 @@ public class Logica implements ILogica{
     private static final Logger LOGGER = Logger.getLogger(Logica.class.getName());
     private static final SecretKey SECRET_KEY = Keys.secretKeyFor(SignatureAlgorithm.HS256);
 
+    // Constructor: inicializa los servicios con la conexión a la base de datos
     public Logica() {
         conexion = new Conexion();
         Connection conn = conexion.getConexion();
@@ -38,6 +39,7 @@ public class Logica implements ILogica{
         authService = new AuthService(pacienteService, medicoService);
     }
 
+    // Inserta un nuevo expediente para un paciente
     @Override
     public boolean insertarExpediente(String idPaciente) {
         try {
@@ -52,6 +54,7 @@ public class Logica implements ILogica{
         }
     }
 
+    // Inserta un nuevo paciente
     @Override
     public boolean insertarPaciente(String nombre, String curp, String fechaNac, String tutor, String pass) {
         try {
@@ -64,6 +67,7 @@ public class Logica implements ILogica{
         }
     }
 
+    // Inserta un nuevo médico
     @Override
     public boolean insertarMedico(String cedula, String nombre, String pass, String especialidad) {
         try {
@@ -75,6 +79,7 @@ public class Logica implements ILogica{
         }
     }
 
+    // Elimina un expediente por ID
     @Override
     public boolean eliminarExpediente(String idExpediente) {
         try {
@@ -85,16 +90,19 @@ public class Logica implements ILogica{
         }
     }
 
+    // Elimina un paciente por CURP
     @Override
     public boolean eliminarPaciente(String curp) {
         return pacienteService.eliminarPaciente(curp);
     }
 
+    // Elimina un médico por cédula
     @Override
     public boolean eliminarMedico(String cedula) {
         return medicoService.eliminarMedico(cedula);
     }
 
+    // Actualiza un expediente existente
     @Override
     public boolean actualizarExpediente(String idExpediente, String idPaciente, String medicosAcceso, String imagenes, String documentos, String textos) {
         try {
@@ -111,6 +119,7 @@ public class Logica implements ILogica{
         }
     }
 
+    // Actualiza la información de un paciente existente
     @Override
     public boolean actualizarPaciente(String nombre, String curp, String fechaNac, String tutor, String pass) {
         try {
@@ -123,6 +132,7 @@ public class Logica implements ILogica{
         }
     }
 
+    // Actualiza la información de un médico existente
     @Override
     public boolean actualizarMedico(String cedula, String nombre, String pass, String especialidad) {
         try {
@@ -134,6 +144,7 @@ public class Logica implements ILogica{
         }
     }
 
+    // Consulta todos los pacientes y retorna una cadena con su información
     @Override
     public String consultarPacientes() {
         List<Paciente> pacientes = pacienteService.obtenerPacientes();
@@ -144,6 +155,7 @@ public class Logica implements ILogica{
         return result.toString();
     }
 
+    // Consulta todos los expedientes y retorna una cadena con su información
     @Override
     public String consultarExpedientes() {
         List<Expediente> expedientes = expedienteService.obtenerExpedientes();
@@ -154,6 +166,7 @@ public class Logica implements ILogica{
         return result.toString();
     }
 
+    // Consulta todos los médicos y retorna una cadena con su información
     @Override
     public String consultarMedicos() {
         List<Medico> medicos = medicoService.obtenerMedicos();
@@ -164,6 +177,7 @@ public class Logica implements ILogica{
         return result.toString();
     }
 
+    // Consulta la información de un paciente por CURP
     @Override
     public String consultarPaciente(String curp) {
         Optional<Paciente> pacienteOpt = Optional.ofNullable(pacienteService.consultarPaciente(curp));
@@ -171,6 +185,7 @@ public class Logica implements ILogica{
                 .orElse("Paciente no encontrado");
     }
 
+    // Consulta la información de un médico por cédula
     @Override
     public String consultarMedico(String cedula) {
         Optional<Medico> medicoOpt = Optional.ofNullable(medicoService.consultarMedico(cedula));
@@ -178,6 +193,7 @@ public class Logica implements ILogica{
                 .orElse("Médico no encontrado");
     }
 
+    // Consulta el expediente de un paciente por su CURP
     @Override
     public String consultarExpediente(String curp) {
         Paciente paciente = pacienteService.consultarPaciente(curp);
@@ -189,27 +205,27 @@ public class Logica implements ILogica{
         }
     }
 
+    // Autentica un paciente por CURP y contraseña
     @Override
     public boolean autenticarPaciente(String curp, String pass) {
         return authService.autenticarPaciente(curp, pass);
     }
+    // Autentica un médico por cédula y contraseña
+@Override
+public boolean autenticarMedico(String cedula, String pass) {
+    return authService.autenticarMedico(cedula, pass);
+}
 
-    @Override
-    public boolean autenticarMedico(String cedula, String pass) {
-        return authService.autenticarMedico(cedula, pass);
-    }
-
-   public boolean autenticar(String credencial, String pass) {
-    if (credencial.length() == 18) {
-        boolean autenticacionPaciente = this.autenticarPaciente(credencial, pass);
-        if (autenticacionPaciente) {
+// Autentica una credencial (paciente o médico) y genera un token JWT
+public boolean autenticar(String credencial, String pass) {
+    if (credencial.length() == 18) { // Si la credencial tiene 18 caracteres, es un CURP (paciente)
+        if (autenticarPaciente(credencial, pass)) {
             String token = generarToken(credencial);
             System.out.println("Token generado para paciente " + credencial + ": " + token);
             return true;
         }
-    } else {
-        boolean autenticacionMedico = this.autenticarMedico(credencial, pass);
-        if (autenticacionMedico) {
+    } else { // De lo contrario, es una cédula (médico)
+        if (autenticarMedico(credencial, pass)) {
             String token = generarToken(credencial);
             System.out.println("Token generado para médico " + credencial + ": " + token);
             return true;
@@ -218,50 +234,55 @@ public class Logica implements ILogica{
     return false;
 }
 
-    public static String generarToken(String sujeto) {
-        return Jwts.builder()
-                .setSubject(sujeto)
-                .setIssuedAt(new java.util.Date())
-                .setExpiration(new java.util.Date(System.currentTimeMillis() + 86400000))
-                .signWith(SECRET_KEY)
-                .compact();
-    }
-    
-    @Override
-    public boolean enviar(String nombre, String mensaje) {
-        SocketCliente cliente = new SocketCliente("localhost", 1234);
-        String result = cliente.enviarMensaje("enviar!" + nombre + "!" + mensaje);
-        return "true".equalsIgnoreCase(result);
-    }
-    
-    @Override
-    public String recibir(String nombre) {
-        SocketCliente cliente = new SocketCliente("localhost", 1234);
-        return cliente.enviarMensaje("recibir!" + nombre);
-    }
-    
-    @Override
-    public boolean cambiarAcceso(String curp) {
-        Paciente paciente = pacienteService.consultarPaciente(curp);
-        if (paciente != null) {
-            Expediente expediente = expedienteService.consultarExpediente(paciente.getId());
-            if (expediente != null) {
-                boolean nuevoAcceso = !expediente.getAcceso();
-                return expedienteService.cambiarAcceso(paciente.getId(), nuevoAcceso);
-            }
+// Genera un token JWT para un sujeto dado
+public static String generarToken(String sujeto) {
+    return Jwts.builder()
+            .setSubject(sujeto)
+            .setIssuedAt(new java.util.Date())
+            .setExpiration(new java.util.Date(System.currentTimeMillis() + 86400000)) // Expira en 24 horas
+            .signWith(SECRET_KEY)
+            .compact();
+}
+
+// Envia un mensaje a través de un socket cliente
+@Override
+public boolean enviar(String nombre, String mensaje) {
+    SocketCliente cliente = new SocketCliente("localhost", 1234);
+    String result = cliente.enviarMensaje("enviar!" + nombre + "!" + mensaje);
+    return "true".equalsIgnoreCase(result);
+}
+
+// Recibe un mensaje a través de un socket cliente
+@Override
+public String recibir(String nombre) {
+    SocketCliente cliente = new SocketCliente("localhost", 1234);
+    return cliente.enviarMensaje("recibir!" + nombre);
+}
+
+// Cambia el acceso de un expediente asociado a un paciente por su CURP
+@Override
+public boolean cambiarAcceso(String curp) {
+    Paciente paciente = pacienteService.consultarPaciente(curp);
+    if (paciente != null) {
+        Expediente expediente = expedienteService.consultarExpediente(paciente.getId());
+        if (expediente != null) {
+            boolean nuevoAcceso = !expediente.getAcceso();
+            return expedienteService.cambiarAcceso(paciente.getId(), nuevoAcceso);
         }
-        return false;
     }
-    
-    @Override
-    public boolean modificarMedicos(String curp, String medicos) {
-        Paciente paciente = pacienteService.consultarPaciente(curp);
-        if (paciente != null) {
-            Expediente expediente = expedienteService.consultarExpediente(paciente.getId());
-            if (expediente != null) {
-                return expedienteService.modificarMedicos(paciente.getId(), medicos);
-            }
+    return false;
+}
+
+// Modifica los médicos que tienen acceso a un expediente asociado a un paciente por su CURP
+@Override
+public boolean modificarMedicos(String curp, String medicos) {
+    Paciente paciente = pacienteService.consultarPaciente(curp);
+    if (paciente != null) {
+        Expediente expediente = expedienteService.consultarExpediente(paciente.getId());
+        if (expediente != null) {
+            return expedienteService.modificarMedicos(paciente.getId(), medicos);
         }
-        return false;
     }
+    return false;
+}
 }
